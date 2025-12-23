@@ -1,0 +1,96 @@
+name: Release to PyPI and GitHub
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-test-release:
+    name: Build, Test, and Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        include:
+          - python-version: '3.10'
+            is_main: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整的git历史，用于生成CHANGELOG
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'  # 启用pip缓存
+          cache-dependency-path: '**/setup.py'  # 缓存依赖的路径
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine pytest flake8 black
+          pip install -e .
+      
+      - name: Code Quality Check (flake8)
+        if: matrix.is_main
+        run: |
+          flake8 github_shell/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 github_shell/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Code Style Check (black)
+        if: matrix.is_main
+        run: |
+          black --check github_shell/
+      
+      - name: Build package
+        if: matrix.is_main
+        run: |
+          python -m build
+        id: build
+      
+      - name: Test package
+        run: |
+          python -m pytest github_shell/tests/ -v
+      
+      - name: Publish to PyPI
+        if: matrix.is_main
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
+      
+      - name: Generate Release Notes from CHANGELOG
+        if: matrix.is_main
+        run: |
+          # 从CHANGELOG.md中提取最新版本的发布说明
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME#v}
+          
+          # 使用awk提取指定版本的发布说明
+          awk -v version="${VERSION}" '/^## \[/{if(found){exit}; if($2=="["version"]"){found=1; next}} found' CHANGELOG.md > release_notes.md
+          
+          # 如果找不到版本，使用默认说明
+          if [ ! -s release_notes.md ]; then
+              echo "# Release ${TAG_NAME}" > release_notes.md
+              echo "" >> release_notes.md
+              echo "## 更新内容" >> release_notes.md
+              echo "- 自动生成的发布说明" >> release_notes.md
+          fi
+          
+          cat release_notes.md
+        id: generate_release_notes
+      
+      - name: Create GitHub Release
+        if: matrix.is_main
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          body_path: release_notes.md
