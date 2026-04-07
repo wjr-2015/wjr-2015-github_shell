@@ -1,0 +1,30 @@
+API
+$env:GITHUB_TOKEN
+
+https://github.com/wjr-2015/wjr-2015-github_shell.git
+
+echo "# wjr-2015-github_shell" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/wjr-2015/wjr-2015-github_shell.git
+git push -u origin main
+
+git remote add origin https://github.com/wjr-2015/wjr-2015-github_shell.git
+git branch -M main
+git push -u origin main
+
+git@github.com:wjr-2015/wjr-2015-github_shell.git
+
+echo "# wjr-2015-github_shell" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin git@github.com:wjr-2015/wjr-2015-github_shell.git
+git push -u origin main
+
+git remote add origin git@github.com:wjr-2015/wjr-2015-github_shell.git
+git branch -M main
+git push -u origin main
